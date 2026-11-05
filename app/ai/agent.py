@@ -17,7 +17,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.ai.claude_client import create, first_text
-from app.ai.tools import TOOLS, claude_tool_specs, run_tool
+from app.ai.openai_client import get_client as openai_client
+from app.ai.tools import TOOLS, claude_tool_specs, openai_tool_specs, run_tool
 from app.core.config import get_settings
 from app.core.errors import NotFoundError
 from app.database.results import Conversation, Message
@@ -65,6 +66,14 @@ class AgentAnswer(BaseModel):
     follow_up_questions: list[str] = Field(default_factory=list)
 
 
+class StrictAnswer(BaseModel):
+    """Same shape without defaults, for OpenAI strict structured outputs."""
+
+    answer: str
+    assumptions: list[str]
+    follow_up_questions: list[str]
+
+
 FALLBACK_ANSWER = AgentAnswer(answer="I could not complete this request. Please try rephrasing it.")
 REFUSAL_ANSWER = AgentAnswer(
     answer="I can't help with that request. I can explain your spending, your "
@@ -110,55 +119,11 @@ def chat(db: Session, profile: Profile, message: str, conversation_id: uuid.UUID
         db.add(conv)
         db.flush()
 
-    settings = get_settings()
-    # Stable system prompt first (cacheable), per-user context in a second block.
-    system = [
-        {"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}},
-        {"type": "text", "text": f"User base currency: {profile.base_currency}. Country: {profile.country}."},
-    ]
-    messages: list[dict] = [*_history(db, conv), {"role": "user", "content": message}]
-    tools = claude_tool_specs()
     tool_log: list[dict] = []
     sources: list[dict] = []
-    parsed: AgentAnswer | None = None
-
-    for _ in range(settings.agent_max_tool_rounds):
-        response = create(
-            max_tokens=16000,
-            system=system,
-            tools=tools,
-            output_config={"effort": "medium", "format": {"type": "json_schema", "schema": ANSWER_SCHEMA}},
-            messages=messages,
-        )
-        if response.stop_reason == "refusal":
-            parsed = REFUSAL_ANSWER
-            break
-        tool_uses = [b for b in response.content if b.type == "tool_use"]
-        if response.stop_reason == "tool_use" and tool_uses:
-            messages.append({"role": "assistant", "content": response.content})
-            results = []
-            for block in tool_uses:
-                result = run_tool(db, profile, block.name, json.dumps(block.input))
-                ok = "error" not in result
-                tool_log.append({"tool": block.name, "ok": ok})
-                if ok and block.name in TOOLS:
-                    sources.extend(_sources(block.name, result))
-                results.append(
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": json.dumps(result, default=str)[:20000],
-                        "is_error": not ok,
-                    }
-                )
-            messages.append({"role": "user", "content": results})
-            continue
-        try:
-            parsed = AgentAnswer.model_validate_json(first_text(response))
-        except ValidationError:
-            parsed = FALLBACK_ANSWER
-        break
-    parsed = parsed or FALLBACK_ANSWER
+    history = _history(db, conv)
+    run = _run_openai if get_settings().llm_provider == "openai" else _run_claude
+    parsed = run(db, profile, history, message, tool_log, sources) or FALLBACK_ANSWER
 
     dedup = []
     for s in sources:
@@ -183,3 +148,97 @@ def chat(db: Session, profile: Profile, message: str, conversation_id: uuid.UUID
         "follow_up_questions": parsed.follow_up_questions[:3],
         **meta,
     }
+
+
+def _execute(
+    db: Session, profile: Profile, name: str, args_json: str, tool_log: list, sources: list
+) -> tuple[str, bool]:
+    result = run_tool(db, profile, name, args_json)
+    ok = "error" not in result
+    tool_log.append({"tool": name, "ok": ok})
+    if ok and name in TOOLS:
+        sources.extend(_sources(name, result))
+    return json.dumps(result, default=str)[:20000], ok
+
+
+def _run_claude(db, profile, history, message, tool_log, sources) -> AgentAnswer | None:
+    """Claude: stable system prompt cached; append-only turns; all tool results in one user message."""
+    system = [
+        {"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}},
+        {"type": "text", "text": f"User base currency: {profile.base_currency}. Country: {profile.country}."},
+    ]
+    messages: list[dict] = [*history, {"role": "user", "content": message}]
+    tools = claude_tool_specs()
+    for _ in range(get_settings().agent_max_tool_rounds):
+        response = create(
+            max_tokens=16000,
+            system=system,
+            tools=tools,
+            output_config={"effort": "medium", "format": {"type": "json_schema", "schema": ANSWER_SCHEMA}},
+            messages=messages,
+        )
+        if response.stop_reason == "refusal":
+            return REFUSAL_ANSWER
+        tool_uses = [b for b in response.content if b.type == "tool_use"]
+        if response.stop_reason == "tool_use" and tool_uses:
+            messages.append({"role": "assistant", "content": response.content})
+            results = []
+            for block in tool_uses:
+                content, ok = _execute(db, profile, block.name, json.dumps(block.input), tool_log, sources)
+                results.append(
+                    {"type": "tool_result", "tool_use_id": block.id, "content": content, "is_error": not ok}
+                )
+            messages.append({"role": "user", "content": results})
+            continue
+        try:
+            return AgentAnswer.model_validate_json(first_text(response))
+        except ValidationError:
+            return None
+    return None
+
+
+def _run_openai(db, profile, history, message, tool_log, sources) -> AgentAnswer | None:
+    messages: list[dict] = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {
+            "role": "system",
+            "content": f"User base currency: {profile.base_currency}. Country: {profile.country}.",
+        },
+        *history,
+        {"role": "user", "content": message},
+    ]
+    client = openai_client()
+    tools = openai_tool_specs()
+    for _ in range(get_settings().agent_max_tool_rounds):
+        completion = client.chat.completions.parse(
+            model=get_settings().openai_model,
+            messages=messages,
+            tools=tools,
+            response_format=StrictAnswer,
+        )
+        msg = completion.choices[0].message
+        if getattr(msg, "refusal", None):
+            return REFUSAL_ANSWER
+        if msg.tool_calls:
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": msg.content or "",
+                    "tool_calls": [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+                        }
+                        for tc in msg.tool_calls
+                    ],
+                }
+            )
+            for tc in msg.tool_calls:
+                content, _ = _execute(db, profile, tc.function.name, tc.function.arguments, tool_log, sources)
+                messages.append({"role": "tool", "tool_call_id": tc.id, "content": content})
+            continue
+        if msg.parsed is None:
+            return None
+        return AgentAnswer(**msg.parsed.model_dump())
+    return None

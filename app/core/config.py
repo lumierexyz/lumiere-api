@@ -36,9 +36,13 @@ class Settings(BaseSettings):
     http_timeout_seconds: float = 15.0
     http_max_retries: int = 3
 
-    # Anthropic (transaction classification fallback and the agent)
+    # LLM provider for transaction classification and the agent: "openai" or "anthropic".
+    # Empty = Anthropic when ANTHROPIC_API_KEY is set, otherwise OpenAI.
+    ai_provider: str = ""
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-opus-5-5"
+    openai_api_key: str = ""
+    openai_model: str = "gpt-5.4-mini"
     agent_max_tool_rounds: int = 6
 
     # Limits
@@ -53,6 +57,16 @@ class Settings(BaseSettings):
         if isinstance(v, str) and not v.strip().startswith("["):
             return [o.strip() for o in v.split(",") if o.strip()]
         return v
+
+    @property
+    def llm_provider(self) -> str:
+        if self.ai_provider in ("openai", "anthropic"):
+            return self.ai_provider
+        return "anthropic" if self.anthropic_api_key else "openai"
+
+    @property
+    def llm_configured(self) -> bool:
+        return bool(self.anthropic_api_key if self.llm_provider == "anthropic" else self.openai_api_key)
 
     @property
     def auth_configured(self) -> bool:

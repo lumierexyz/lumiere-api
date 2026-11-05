@@ -16,6 +16,8 @@ os.environ.update(
         "SUPABASE_JWT_SECRET": "",
         "FRED_API_KEY": "test-fred-key",
         "ANTHROPIC_API_KEY": "",
+        "OPENAI_API_KEY": "",
+        "AI_PROVIDER": "anthropic",
         "RATE_LIMIT_PER_MINUTE": "10000",
         "HTTP_MAX_RETRIES": "2",
     }

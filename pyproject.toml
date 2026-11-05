@@ -18,6 +18,7 @@ dependencies = [
   "cvxpy>=1.5",
   "python-multipart>=0.0.9",
   "anthropic>=2.6.0",
+  "openai>=3.46.0",
 ]
 
 [dependency-groups]

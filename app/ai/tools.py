@@ -172,6 +172,21 @@ def _strict(schema: dict) -> dict:
     return fix(schema)
 
 
+def openai_tool_specs() -> list[dict]:
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": n,
+                "description": d,
+                "strict": True,
+                "parameters": _strict(m.model_json_schema()),
+            },
+        }
+        for n, (d, m, _) in TOOLS.items()
+    ]
+
+
 def claude_tool_specs() -> list[dict]:
     return [
         {"name": n, "description": d, "strict": True, "input_schema": _strict(m.model_json_schema())}

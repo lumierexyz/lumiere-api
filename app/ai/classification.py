@@ -9,6 +9,8 @@ can at worst produce a wrong category, which the user can correct.
 from pydantic import BaseModel, Field, ValidationError
 
 from app.ai.claude_client import create, first_text
+from app.ai.openai_client import get_client as openai_client
+from app.core.config import get_settings
 from app.core.logging import logger
 from app.transactions.models import Category
 
@@ -69,6 +71,8 @@ def amount_bucket(abs_amount: float) -> str:
 def classify_batch(items: list[ItemIn]) -> dict[int, ItemOut]:
     if not items:
         return {}
+    if get_settings().llm_provider == "openai":
+        return _classify_openai(items)
     response = create(
         max_tokens=4000,
         system=SYSTEM,
@@ -86,6 +90,29 @@ def classify_batch(items: list[ItemIn]) -> dict[int, ItemOut]:
     try:
         parsed = BatchOut.model_validate_json(first_text(response))
     except ValidationError:
+        logger.warning("classification_invalid_output", extra={"count": len(items)})
+        return {}
+    wanted = {i.id for i in items}
+    return {r.id: r for r in parsed.results if r.id in wanted}
+
+
+def _classify_openai(items: list[ItemIn]) -> dict[int, ItemOut]:
+    completion = openai_client().chat.completions.parse(
+        model=get_settings().openai_model,
+        messages=[
+            {
+                "role": "system",
+                "content": SYSTEM + " Allowed categories: " + ", ".join(c.value for c in Category),
+            },
+            {
+                "role": "user",
+                "content": "Items (JSON):\n[" + ",".join(i.model_dump_json() for i in items) + "]",
+            },
+        ],
+        response_format=BatchOut,
+    )
+    parsed = completion.choices[0].message.parsed
+    if parsed is None:
         logger.warning("classification_invalid_output", extra={"count": len(items)})
         return {}
     wanted = {i.id for i in items}
