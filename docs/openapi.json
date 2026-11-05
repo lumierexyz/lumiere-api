@@ -1,0 +1,2059 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "Lumiere API",
+  "description": "\nLumiere financial intelligence API.\n\nAll figures are computed deterministically from your imported transactions and official statistics\n(FRED, Eurostat). Forecasts, coverage estimates and portfolio results are conditional estimates and\nsimulations, not guarantees or investment advice. Lumiere does not hold funds or execute trades.\n",
+  "version": "0.1.0"
+ },
+ "paths": {
+  "/health": {
+   "get": {
+    "tags": [
+     "ops"
+    ],
+    "summary": "Health",
+    "operationId": "health_health_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Health Health Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/ready": {
+   "get": {
+    "tags": [
+     "ops"
+    ],
+    "summary": "Ready",
+    "operationId": "ready_ready_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/me": {
+   "get": {
+    "tags": [
+     "profile"
+    ],
+    "summary": "Get Me",
+    "operationId": "get_me_api_v1_me_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProfileOut"
+        }
+       }
+      }
+     }
+    }
+   },
+   "patch": {
+    "tags": [
+     "profile"
+    ],
+    "summary": "Update Me",
+    "operationId": "update_me_api_v1_me_patch",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProfileUpdate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProfileOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "profile"
+    ],
+    "summary": "Delete Account",
+    "operationId": "delete_account_api_v1_me_delete",
+    "parameters": [
+     {
+      "name": "confirm",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "description": "Must be true to delete the account permanently.",
+       "default": false,
+       "title": "Confirm"
+      },
+      "description": "Must be true to delete the account permanently."
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeletionResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/me/data": {
+   "delete": {
+    "tags": [
+     "profile"
+    ],
+    "summary": "Delete Financial Data",
+    "description": "Erase all transactions, imports, forecasts, simulations and conversations; keep the account.",
+    "operationId": "delete_financial_data_api_v1_me_data_delete",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeletionResult"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/transactions/import": {
+   "post": {
+    "tags": [
+     "transactions"
+    ],
+    "summary": "Import Csv",
+    "operationId": "import_csv_api_v1_transactions_import_post",
+    "requestBody": {
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_import_csv_api_v1_transactions_import_post"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ImportOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/transactions": {
+   "get": {
+    "tags": [
+     "transactions"
+    ],
+    "summary": "List Transactions",
+    "operationId": "list_transactions_api_v1_transactions_get",
+    "parameters": [
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 500,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0,
+       "title": "Offset"
+      }
+     },
+     {
+      "name": "start",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "date"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Start"
+      }
+     },
+     {
+      "name": "end",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "date"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "End"
+      }
+     },
+     {
+      "name": "category",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "$ref": "#/components/schemas/Category"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Category"
+      }
+     },
+     {
+      "name": "kind",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "$ref": "#/components/schemas/Kind"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Kind"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Page_TransactionOut_"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/transactions/{transaction_id}": {
+   "patch": {
+    "tags": [
+     "transactions"
+    ],
+    "summary": "Correct Transaction",
+    "operationId": "correct_transaction_api_v1_transactions__transaction_id__patch",
+    "parameters": [
+     {
+      "name": "transaction_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Transaction Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CorrectionIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/TransactionOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/transactions/categorize": {
+   "post": {
+    "tags": [
+     "transactions"
+    ],
+    "summary": "Categorize With Ai",
+    "description": "Classify rows the deterministic rules could not place, using the LLM.",
+    "operationId": "categorize_with_ai_api_v1_transactions_categorize_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Categorize With Ai Api V1 Transactions Categorize Post"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/imports": {
+   "get": {
+    "tags": [
+     "transactions"
+    ],
+    "summary": "List Imports",
+    "operationId": "list_imports_api_v1_imports_get",
+    "parameters": [
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 200,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0,
+       "title": "Offset"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Page_ImportBatchOut_"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/expenses/summary": {
+   "get": {
+    "tags": [
+     "expenses"
+    ],
+    "summary": "Expense Summary",
+    "operationId": "expense_summary_api_v1_expenses_summary_get",
+    "parameters": [
+     {
+      "name": "start",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "date"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Start"
+      }
+     },
+     {
+      "name": "end",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "date"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "End"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Expense Summary Api V1 Expenses Summary Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/expenses/categories": {
+   "get": {
+    "tags": [
+     "expenses"
+    ],
+    "summary": "Expense Categories",
+    "operationId": "expense_categories_api_v1_expenses_categories_get",
+    "parameters": [
+     {
+      "name": "start",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "date"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Start"
+      }
+     },
+     {
+      "name": "end",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "date"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "End"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Expense Categories Api V1 Expenses Categories Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/expenses/history": {
+   "get": {
+    "tags": [
+     "expenses"
+    ],
+    "summary": "Expense History",
+    "description": "Monthly totals by category, most recent month first (paginated by month).",
+    "operationId": "expense_history_api_v1_expenses_history_get",
+    "parameters": [
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 120,
+       "minimum": 1,
+       "default": 24,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0,
+       "title": "Offset"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Expense History Api V1 Expenses History Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/expenses/recurring": {
+   "get": {
+    "tags": [
+     "expenses"
+    ],
+    "summary": "Expense Recurring",
+    "operationId": "expense_recurring_api_v1_expenses_recurring_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Expense Recurring Api V1 Expenses Recurring Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/economic-data/series": {
+   "get": {
+    "tags": [
+     "economic data"
+    ],
+    "summary": "List Series",
+    "description": "Price series mapped to each spending category for the caller's country, with freshness.",
+    "operationId": "list_series_api_v1_economic_data_series_get",
+    "parameters": [
+     {
+      "name": "refresh",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "default": false,
+       "title": "Refresh"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response List Series Api V1 Economic Data Series Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/economic-data/fx/refresh": {
+   "post": {
+    "tags": [
+     "economic data"
+    ],
+    "summary": "Refresh Fx Rates",
+    "description": "Load FRED H.10 reference rates needed to convert the caller's currencies.",
+    "operationId": "refresh_fx_rates_api_v1_economic_data_fx_refresh_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Refresh Fx Rates Api V1 Economic Data Fx Refresh Post"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/pei": {
+   "get": {
+    "tags": [
+     "pei & forecasts"
+    ],
+    "summary": "Get Pei",
+    "operationId": "get_pei_api_v1_pei_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Get Pei Api V1 Pei Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/pei/history": {
+   "get": {
+    "tags": [
+     "pei & forecasts"
+    ],
+    "summary": "Get Pei History",
+    "operationId": "get_pei_history_api_v1_pei_history_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Get Pei History Api V1 Pei History Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/pei/composition": {
+   "get": {
+    "tags": [
+     "pei & forecasts"
+    ],
+    "summary": "Get Pei Composition",
+    "operationId": "get_pei_composition_api_v1_pei_composition_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Get Pei Composition Api V1 Pei Composition Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/forecasts": {
+   "post": {
+    "tags": [
+     "pei & forecasts"
+    ],
+    "summary": "Create Forecast",
+    "operationId": "create_forecast_api_v1_forecasts_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ForecastIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Create Forecast Api V1 Forecasts Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/forecasts/{forecast_id}": {
+   "get": {
+    "tags": [
+     "pei & forecasts"
+    ],
+    "summary": "Get Forecast",
+    "operationId": "get_forecast_api_v1_forecasts__forecast_id__get",
+    "parameters": [
+     {
+      "name": "forecast_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Forecast Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Get Forecast Api V1 Forecasts  Forecast Id  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/coverage/calculate": {
+   "post": {
+    "tags": [
+     "coverage"
+    ],
+    "summary": "Calculate Coverage",
+    "operationId": "calculate_coverage_api_v1_coverage_calculate_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CoverageIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Calculate Coverage Api V1 Coverage Calculate Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/agent/chat": {
+   "post": {
+    "tags": [
+     "agent"
+    ],
+    "summary": "Chat",
+    "operationId": "chat_api_v1_agent_chat_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ChatIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Chat Api V1 Agent Chat Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/agent/conversations": {
+   "get": {
+    "tags": [
+     "agent"
+    ],
+    "summary": "List Conversations",
+    "operationId": "list_conversations_api_v1_agent_conversations_get",
+    "parameters": [
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 100,
+       "minimum": 1,
+       "default": 20,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0,
+       "title": "Offset"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response List Conversations Api V1 Agent Conversations Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/agent/conversations/{conversation_id}": {
+   "get": {
+    "tags": [
+     "agent"
+    ],
+    "summary": "Get Conversation",
+    "operationId": "get_conversation_api_v1_agent_conversations__conversation_id__get",
+    "parameters": [
+     {
+      "name": "conversation_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Conversation Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Get Conversation Api V1 Agent Conversations  Conversation Id  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "agent"
+    ],
+    "summary": "Delete Conversation",
+    "operationId": "delete_conversation_api_v1_agent_conversations__conversation_id__delete",
+    "parameters": [
+     {
+      "name": "conversation_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Conversation Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/portfolio/simulate": {
+   "post": {
+    "tags": [
+     "portfolio research (simulation)"
+    ],
+    "summary": "Run Simulation",
+    "operationId": "run_simulation_api_v1_portfolio_simulate_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SimulationIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Run Simulation Api V1 Portfolio Simulate Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/portfolio/simulations/{simulation_id}": {
+   "get": {
+    "tags": [
+     "portfolio research (simulation)"
+    ],
+    "summary": "Get Simulation",
+    "operationId": "get_simulation_api_v1_portfolio_simulations__simulation_id__get",
+    "parameters": [
+     {
+      "name": "simulation_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Simulation Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Get Simulation Api V1 Portfolio Simulations  Simulation Id  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "components": {
+  "schemas": {
+   "Body_import_csv_api_v1_transactions_import_post": {
+    "properties": {
+     "file": {
+      "type": "string",
+      "contentMediaType": "application/octet-stream",
+      "title": "File",
+      "description": "Bank statement CSV"
+     },
+     "currency": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^[A-Z]{3}$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Currency",
+      "description": "Currency for rows without a currency column (default: profile)"
+     },
+     "date_order": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "DMY",
+         "MDY",
+         "YMD"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Date Order"
+     },
+     "sign_convention": {
+      "type": "string",
+      "enum": [
+       "auto",
+       "negative_is_outflow",
+       "positive_is_outflow"
+      ],
+      "title": "Sign Convention",
+      "default": "auto"
+     }
+    },
+    "type": "object",
+    "required": [
+     "file"
+    ],
+    "title": "Body_import_csv_api_v1_transactions_import_post"
+   },
+   "Category": {
+    "type": "string",
+    "enum": [
+     "housing",
+     "groceries",
+     "restaurants",
+     "transportation",
+     "energy",
+     "healthcare",
+     "insurance",
+     "subscriptions",
+     "education",
+     "entertainment",
+     "other"
+    ],
+    "title": "Category"
+   },
+   "ChatIn": {
+    "properties": {
+     "message": {
+      "type": "string",
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Message"
+     },
+     "conversation_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Conversation Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "message"
+    ],
+    "title": "ChatIn"
+   },
+   "CorrectionIn": {
+    "properties": {
+     "category": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Category"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "kind": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Kind"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "type": "object",
+    "title": "CorrectionIn"
+   },
+   "CoverageIn": {
+    "properties": {
+     "reserves": {
+      "type": "number",
+      "maximum": 1000000000000.0,
+      "exclusiveMinimum": 0.0,
+      "title": "Reserves",
+      "description": "User-declared available reserves (not verified)"
+     },
+     "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "title": "Currency"
+     },
+     "scenarios": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/ScenarioIn"
+        },
+        "type": "array",
+        "maxItems": 8
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Scenarios"
+     },
+     "assumed_annual_inflation": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 1.0,
+        "minimum": -0.2
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Assumed Annual Inflation"
+     }
+    },
+    "type": "object",
+    "required": [
+     "reserves",
+     "currency"
+    ],
+    "title": "CoverageIn"
+   },
+   "DeletionResult": {
+    "properties": {
+     "deleted_financial_data": {
+      "type": "boolean",
+      "title": "Deleted Financial Data"
+     },
+     "deleted_auth_account": {
+      "type": "boolean",
+      "title": "Deleted Auth Account"
+     },
+     "note": {
+      "type": "string",
+      "title": "Note"
+     }
+    },
+    "type": "object",
+    "required": [
+     "deleted_financial_data",
+     "deleted_auth_account",
+     "note"
+    ],
+    "title": "DeletionResult"
+   },
+   "ForecastIn": {
+    "properties": {
+     "horizon_months": {
+      "type": "integer",
+      "enum": [
+       3,
+       6,
+       12,
+       24
+      ],
+      "title": "Horizon Months",
+      "default": 12
+     },
+     "scenarios": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/ScenarioIn"
+        },
+        "type": "array",
+        "maxItems": 8
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Scenarios",
+      "description": "Defaults to baseline, lower (-1.5 pp) and higher (+3 pp) inflation scenarios"
+     },
+     "assumed_annual_inflation": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 1.0,
+        "minimum": -0.2
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Assumed Annual Inflation",
+      "description": "Used only for categories with no available price index"
+     }
+    },
+    "type": "object",
+    "title": "ForecastIn"
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "type": "array",
+      "title": "Detail"
+     }
+    },
+    "type": "object",
+    "title": "HTTPValidationError"
+   },
+   "ImportBatchOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "filename": {
+      "type": "string",
+      "title": "Filename"
+     },
+     "created_at": {
+      "type": "string",
+      "title": "Created At"
+     },
+     "rows": {
+      "type": "integer",
+      "title": "Rows"
+     },
+     "imported": {
+      "type": "integer",
+      "title": "Imported"
+     },
+     "duplicates": {
+      "type": "integer",
+      "title": "Duplicates"
+     },
+     "rejected": {
+      "type": "integer",
+      "title": "Rejected"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "filename",
+     "created_at",
+     "rows",
+     "imported",
+     "duplicates",
+     "rejected"
+    ],
+    "title": "ImportBatchOut"
+   },
+   "ImportOut": {
+    "properties": {
+     "import_id": {
+      "type": "string",
+      "title": "Import Id"
+     },
+     "rows": {
+      "type": "integer",
+      "title": "Rows"
+     },
+     "imported": {
+      "type": "integer",
+      "title": "Imported"
+     },
+     "duplicates": {
+      "type": "integer",
+      "title": "Duplicates"
+     },
+     "rejected": {
+      "type": "integer",
+      "title": "Rejected"
+     },
+     "rejected_rows": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Rejected Rows"
+     },
+     "warnings": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Warnings"
+     },
+     "normalization": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Normalization"
+     }
+    },
+    "type": "object",
+    "required": [
+     "import_id",
+     "rows",
+     "imported",
+     "duplicates",
+     "rejected",
+     "rejected_rows",
+     "warnings",
+     "normalization"
+    ],
+    "title": "ImportOut"
+   },
+   "Kind": {
+    "type": "string",
+    "enum": [
+     "expense",
+     "income",
+     "transfer",
+     "refund"
+    ],
+    "title": "Kind",
+    "description": "Economic nature of a row. Only EXPENSE (net of REFUND) enters spending analytics."
+   },
+   "Page_ImportBatchOut_": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/ImportBatchOut"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "total": {
+      "type": "integer",
+      "title": "Total"
+     },
+     "limit": {
+      "type": "integer",
+      "title": "Limit"
+     },
+     "offset": {
+      "type": "integer",
+      "title": "Offset"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items",
+     "total",
+     "limit",
+     "offset"
+    ],
+    "title": "Page[ImportBatchOut]"
+   },
+   "Page_TransactionOut_": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/TransactionOut"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "total": {
+      "type": "integer",
+      "title": "Total"
+     },
+     "limit": {
+      "type": "integer",
+      "title": "Limit"
+     },
+     "offset": {
+      "type": "integer",
+      "title": "Offset"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items",
+     "total",
+     "limit",
+     "offset"
+    ],
+    "title": "Page[TransactionOut]"
+   },
+   "ProfileOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "email": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Email"
+     },
+     "display_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Display Name"
+     },
+     "base_currency": {
+      "type": "string",
+      "title": "Base Currency"
+     },
+     "country": {
+      "type": "string",
+      "title": "Country"
+     },
+     "date_order": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Date Order"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "email",
+     "display_name",
+     "base_currency",
+     "country",
+     "date_order"
+    ],
+    "title": "ProfileOut"
+   },
+   "ProfileUpdate": {
+    "properties": {
+     "display_name": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 120
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Display Name"
+     },
+     "base_currency": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^[A-Z]{3}$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Base Currency"
+     },
+     "country": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^[A-Z]{2}$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Country"
+     },
+     "date_order": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "DMY",
+         "MDY",
+         "YMD"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Date Order"
+     }
+    },
+    "type": "object",
+    "title": "ProfileUpdate"
+   },
+   "ScenarioIn": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "maxLength": 40,
+      "minLength": 1,
+      "title": "Name"
+     },
+     "inflation_shift_pp": {
+      "type": "number",
+      "maximum": 50.0,
+      "minimum": -20.0,
+      "title": "Inflation Shift Pp",
+      "description": "Added to every category's annual inflation, in percentage points",
+      "default": 0.0
+     },
+     "shocks": {
+      "additionalProperties": {
+       "type": "number"
+      },
+      "propertyNames": {
+       "$ref": "#/components/schemas/Category"
+      },
+      "type": "object",
+      "title": "Shocks",
+      "description": "One-off price level change by category (0.2 = +20%)"
+     }
+    },
+    "type": "object",
+    "required": [
+     "name"
+    ],
+    "title": "ScenarioIn"
+   },
+   "SimulationIn": {
+    "properties": {
+     "budget": {
+      "type": "number",
+      "maximum": 1000000000000.0,
+      "exclusiveMinimum": 0.0,
+      "title": "Budget",
+      "description": "Hypothetical amount to allocate (base currency)"
+     },
+     "max_weight": {
+      "type": "number",
+      "maximum": 1.0,
+      "exclusiveMinimum": 0.0,
+      "title": "Max Weight",
+      "default": 0.6
+     },
+     "cash_rate": {
+      "type": "number",
+      "maximum": 0.3,
+      "minimum": -0.05,
+      "title": "Cash Rate",
+      "default": 0.03
+     },
+     "linker_real_yield": {
+      "type": "number",
+      "maximum": 0.1,
+      "minimum": -0.05,
+      "title": "Linker Real Yield",
+      "default": 0.01
+     },
+     "tracker_cost": {
+      "type": "number",
+      "maximum": 0.1,
+      "minimum": 0.0,
+      "title": "Tracker Cost",
+      "default": 0.005
+     },
+     "binary_strike": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 0.5,
+        "minimum": -0.1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Binary Strike"
+     },
+     "binary_price": {
+      "anyOf": [
+       {
+        "type": "number",
+        "exclusiveMaximum": 0.99,
+        "exclusiveMinimum": 0.01
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Binary Price"
+     },
+     "n_scenarios": {
+      "type": "integer",
+      "maximum": 10000.0,
+      "minimum": 200.0,
+      "title": "N Scenarios",
+      "default": 2000
+     },
+     "seed": {
+      "type": "integer",
+      "minimum": 0.0,
+      "title": "Seed",
+      "default": 7
+     },
+     "stress_scenarios": {
+      "items": {
+       "$ref": "#/components/schemas/StressScenario"
+      },
+      "type": "array",
+      "maxItems": 10,
+      "title": "Stress Scenarios"
+     }
+    },
+    "type": "object",
+    "required": [
+     "budget"
+    ],
+    "title": "SimulationIn"
+   },
+   "StressScenario": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "maxLength": 40,
+      "title": "Name"
+     },
+     "inflation": {
+      "additionalProperties": {
+       "type": "number"
+      },
+      "type": "object",
+      "title": "Inflation",
+      "description": "12-month inflation by category or 'headline', e.g. 0.08"
+     }
+    },
+    "type": "object",
+    "required": [
+     "name",
+     "inflation"
+    ],
+    "title": "StressScenario"
+   },
+   "TransactionOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "booked_on": {
+      "type": "string",
+      "format": "date",
+      "title": "Booked On"
+     },
+     "description": {
+      "type": "string",
+      "title": "Description"
+     },
+     "merchant": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Merchant"
+     },
+     "amount": {
+      "type": "string",
+      "title": "Amount"
+     },
+     "currency": {
+      "type": "string",
+      "title": "Currency"
+     },
+     "kind": {
+      "type": "string",
+      "title": "Kind"
+     },
+     "category": {
+      "type": "string",
+      "title": "Category"
+     },
+     "category_source": {
+      "type": "string",
+      "title": "Category Source"
+     },
+     "category_confidence": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Category Confidence"
+     },
+     "user_corrected": {
+      "type": "boolean",
+      "title": "User Corrected"
+     },
+     "import_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Import Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "booked_on",
+     "description",
+     "merchant",
+     "amount",
+     "currency",
+     "kind",
+     "category",
+     "category_source",
+     "category_confidence",
+     "user_corrected",
+     "import_id"
+    ],
+    "title": "TransactionOut"
+   },
+   "ValidationError": {
+    "properties": {
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "type": "array",
+      "title": "Location"
+     },
+     "msg": {
+      "type": "string",
+      "title": "Message"
+     },
+     "type": {
+      "type": "string",
+      "title": "Error Type"
+     },
+     "input": {
+      "title": "Input"
+     },
+     "ctx": {
+      "type": "object",
+      "title": "Context"
+     }
+    },
+    "type": "object",
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError"
+   }
+  }
+ }
+}
