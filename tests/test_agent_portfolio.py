@@ -3,9 +3,9 @@ import json
 import httpx
 import pytest
 
-from app.ai import openai_client
-from app.ai.agent import AgentAnswer
+from app.ai import claude_client
 from app.economic_data import http as econ_http
+from tests.fake_claude import FakeClaude, message, text_block, tool_use
 from tests.fixtures import monthly_statement_csv
 from tests.mock_providers import ProviderMock
 
@@ -25,118 +25,102 @@ def seeded(client, auth):
 # ---------------------------------------------------------------- agent
 
 
-class _ToolCall:
-    def __init__(self, name, args):
-        self.id = f"call_{name}"
-        self.type = "function"
-        self.function = type("Fn", (), {"name": name, "arguments": json.dumps(args)})()
-
-
-class _Msg:
-    def __init__(self, tool_calls=None, parsed=None):
-        self.tool_calls = tool_calls
-        self.parsed = parsed
-        self.content = None
-
-
-class ScriptedClient:
-    """Fake OpenAI client: replays a scripted sequence of model turns and records requests."""
-
-    def __init__(self, turns):
-        self.turns = list(turns)
-        self.requests = []
-        outer = self
-
-        class Completions:
-            def parse(self, **kw):
-                outer.requests.append(kw)
-                msg = outer.turns.pop(0)
-                return type("C", (), {"choices": [type("Ch", (), {"message": msg})()]})()
-
-        self.chat = type("Chat", (), {"completions": Completions()})()
+def answer(text, assumptions=()):
+    return message(text_block({"answer": text, "assumptions": list(assumptions), "follow_up_questions": []}))
 
 
 @pytest.fixture()
-def fake_openai():
-    holder = {}
-
+def fake_claude():
     def install(turns):
-        holder["client"] = ScriptedClient(turns)
-        openai_client.set_client(holder["client"])
-        return holder["client"]
+        fake = FakeClaude(list(turns))
+        claude_client.set_client(fake)
+        return fake
 
     yield install
-    openai_client.set_client(None)
+    claude_client.set_client(None)
 
 
-def test_agent_uses_tools_and_server_sources(seeded, auth, fake_openai):
-    fake = fake_openai(
+def tool_results(request) -> list[dict]:
+    """tool_result blocks of the last user message of a recorded request."""
+    return [b for b in request["messages"][-1]["content"] if b.get("type") == "tool_result"]
+
+
+def test_agent_uses_tools_and_server_sources(seeded, auth, fake_claude):
+    fake = fake_claude(
         [
-            _Msg(
-                tool_calls=[
-                    _ToolCall("get_personal_expense_index", {}),
-                    _ToolCall(
-                        "calculate_expense_coverage",
-                        {"reserves": 20000, "currency": "USD", "inflation_shift_pp": 0, "shocks": []},
-                    ),
-                ]
+            message(
+                tool_use("get_personal_expense_index", {}, 0),
+                tool_use(
+                    "calculate_expense_coverage",
+                    {"reserves": 20000, "currency": "USD", "inflation_shift_pp": 0, "shocks": []},
+                    1,
+                ),
             ),
-            _Msg(
-                parsed=AgentAnswer(
-                    answer="Your PEI rose about 4.3% over the year.",
-                    assumptions=["baseline"],
-                    follow_up_questions=[],
-                )
-            ),
+            answer("Your PEI rose about 4.3% over the year.", ["baseline"]),
         ]
     )
     r = seeded.post("/api/v1/agent/chat", headers=auth, json={"message": "How exposed am I to inflation?"})
-    assert r.status_code == 200
+    assert r.status_code == 200, r.text
     body = r.json()
-    assert body["grounded"] is True
+    assert body["answer"].startswith("Your PEI") and body["grounded"] is True
     assert {s["tool"] for s in body["sources"] if s["type"] == "calculation"} == {
         "get_personal_expense_index",
         "calculate_expense_coverage",
     }
     assert any(s["type"] == "economic_series" and s["series_id"] == "CUSR0000SAH1" for s in body["sources"])
-    # Tool results sent back to the model contain no transaction descriptions or merchant names.
-    tool_msgs = [m for m in fake.requests[1]["messages"] if m["role"] == "tool"]
-    blob = " ".join(m["content"] for m in tool_msgs)
+    second = fake.requests[1]
+    # All tool results come back in one user message, after the assistant turn appended unchanged.
+    assert second["messages"][-2]["role"] == "assistant"
+    results = tool_results(second)
+    assert [r["tool_use_id"] for r in results] == [
+        "toolu_get_personal_expense_index_0",
+        "toolu_calculate_expense_coverage_1",
+    ]
+    blob = " ".join(r["content"] for r in results)
     assert "WHOLE FOODS" not in blob and "LANDLORD" not in blob and "NETFLIX" not in blob
-    # Tool specs are strict and expose no user identifier parameter.
-    specs = json.dumps(fake.requests[0]["tools"])
-    assert "user_id" not in specs and '"strict": true' in specs
+    # Strict tool schemas, no user identifier parameter, fallback enabled, structured final answer.
+    first = fake.requests[0]
+    specs = json.dumps(first["tools"])
+    assert "user_id" not in specs and all(t["strict"] is True for t in first["tools"])
+    assert first["fallbacks"] == "default" and "server-side-fallback-2026-07-01" in first["betas"]
+    assert first["output_config"]["format"]["type"] == "json_schema"
     conv = seeded.get(f"/api/v1/agent/conversations/{body['conversation_id']}", headers=auth).json()
     assert [m["role"] for m in conv["messages"]] == ["user", "assistant"]
 
 
-def test_agent_conversation_isolation(seeded, auth, other_auth, fake_openai):
-    fake_openai([_Msg(parsed=AgentAnswer(answer="Hi", assumptions=[], follow_up_questions=[]))])
+def test_agent_conversation_isolation(seeded, auth, other_auth, fake_claude):
+    fake_claude([answer("Hi")])
     cid = seeded.post("/api/v1/agent/chat", headers=auth, json={"message": "hello"}).json()["conversation_id"]
     assert seeded.get(f"/api/v1/agent/conversations/{cid}", headers=other_auth).status_code == 404
-    fake_openai([_Msg(parsed=AgentAnswer(answer="x", assumptions=[], follow_up_questions=[]))])
+    fake_claude([answer("x")])
     r = seeded.post(
         "/api/v1/agent/chat", headers=other_auth, json={"message": "continue", "conversation_id": cid}
     )
     assert r.status_code == 404
 
 
-def test_agent_rejects_unknown_tool_and_bad_args(seeded, auth, fake_openai):
-    fake = fake_openai(
+def test_agent_rejects_unknown_tool_and_bad_args(seeded, auth, fake_claude):
+    fake = fake_claude(
         [
-            _Msg(
-                tool_calls=[
-                    _ToolCall("transfer_funds", {"to": "attacker"}),
-                    _ToolCall("forecast_expenses", {"horizon_months": 7}),
-                ]
+            message(
+                tool_use("transfer_funds", {"to": "attacker"}, 0),
+                tool_use("forecast_expenses", {"horizon_months": 7}, 1),
             ),
-            _Msg(parsed=AgentAnswer(answer="I can't do that.", assumptions=[], follow_up_questions=[])),
+            answer("I can't do that."),
         ]
     )
     body = seeded.post("/api/v1/agent/chat", headers=auth, json={"message": "send my money"}).json()
     assert body["grounded"] is False
-    tool_msgs = [json.loads(m["content"]) for m in fake.requests[1]["messages"] if m["role"] == "tool"]
-    assert tool_msgs[0]["error"].startswith("Unknown tool") and "Invalid arguments" in tool_msgs[1]["error"]
+    results = tool_results(fake.requests[1])
+    assert all(r["is_error"] for r in results)
+    assert json.loads(results[0]["content"])["error"].startswith("Unknown tool")
+    assert "Invalid arguments" in json.loads(results[1]["content"])["error"]
+
+
+def test_agent_refusal_is_handled(seeded, auth, fake_claude):
+    fake_claude([message(stop_reason="refusal")])
+    body = seeded.post("/api/v1/agent/chat", headers=auth, json={"message": "something off-policy"}).json()
+    assert body["answer"].startswith("I can't help with that request")
 
 
 def test_agent_unavailable_without_key(seeded, auth):

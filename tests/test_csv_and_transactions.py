@@ -98,8 +98,8 @@ def test_upload_limits_and_type(client, auth, monkeypatch):
 
 
 def test_user_correction_is_never_overwritten_by_ai(client, auth):
-    from app.ai import openai_client
-    from app.ai.classification import BatchOut, ItemOut
+    from app.ai import claude_client
+    from tests.fake_claude import FakeClaude, message, text_block
 
     client.post(
         "/api/v1/transactions/import",
@@ -116,32 +116,24 @@ def test_user_correction_is_never_overwritten_by_ai(client, auth):
     target = next(i for i in items if i["description"].startswith("ZZZ"))
     client.patch(f"/api/v1/transactions/{target['id']}", headers=auth, json={"category": "education"})
 
-    class Msg:
-        def __init__(self, parsed):
-            self.parsed = parsed
-
-    class FakeCompletions:
-        def __init__(self):
-            self.calls = []
-
-        def parse(self, **kw):
-            self.calls.append(kw)
-            n = kw["messages"][1]["content"].count('"id"')
-            parsed = BatchOut(
-                results=[ItemOut(id=i, category=Category.ENTERTAINMENT, confidence=0.7) for i in range(n)]
+    def respond(kw):
+        n = kw["messages"][0]["content"].count('"id"')
+        return message(
+            text_block(
+                {"results": [{"id": i, "category": "entertainment", "confidence": 0.7} for i in range(n)]}
             )
-            return type("C", (), {"choices": [type("Ch", (), {"message": Msg(parsed)})()]})()
+        )
 
-    fake = type("F", (), {})()
-    fake.chat = type("Chat", (), {})()
-    fake.chat.completions = FakeCompletions()
-    openai_client.set_client(fake)
+    fake = FakeClaude(respond)
+    claude_client.set_client(fake)
     try:
         r = client.post("/api/v1/transactions/categorize", headers=auth)
     finally:
-        openai_client.set_client(None)
+        claude_client.set_client(None)
     assert r.json() == {"considered": 1, "updated": 1}
-    sent = fake.chat.completions.calls[0]["messages"][1]["content"]
+    req = fake.requests[0]
+    sent = req["messages"][0]["content"]
+    assert req["fallbacks"] == "default" and req["output_config"]["format"]["type"] == "json_schema"
     assert "QQQ" in sent and "ZZZ" not in sent and "-60" not in sent  # minimal data, no amounts
     by_desc = {i["description"]: i for i in client.get("/api/v1/transactions", headers=auth).json()["items"]}
     assert by_desc["ZZZ UNKNOWN"]["category"] == "education" and by_desc["ZZZ UNKNOWN"]["user_corrected"]

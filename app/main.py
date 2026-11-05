@@ -81,7 +81,7 @@ def create_app() -> FastAPI:
             "database": False,
             "auth_configured": settings.auth_configured,
             "fred_configured": bool(settings.fred_api_key),
-            "openai_configured": bool(settings.openai_api_key),
+            "anthropic_configured": bool(settings.anthropic_api_key),
         }
         try:
             with get_engine().connect() as conn:

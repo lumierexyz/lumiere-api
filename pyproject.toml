@@ -16,8 +16,8 @@ dependencies = [
   "pandas>=2.2",
   "numpy>=1.26",
   "cvxpy>=1.5",
-  "openai>=1.50",
   "python-multipart>=0.0.9",
+  "anthropic>=2.6.0",
 ]
 
 [dependency-groups]

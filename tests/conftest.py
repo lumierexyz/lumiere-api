@@ -15,7 +15,7 @@ os.environ.update(
         "SUPABASE_URL": "https://test-project.supabase.co",
         "SUPABASE_JWT_SECRET": "",
         "FRED_API_KEY": "test-fred-key",
-        "OPENAI_API_KEY": "",
+        "ANTHROPIC_API_KEY": "",
         "RATE_LIMIT_PER_MINUTE": "10000",
         "HTTP_MAX_RETRIES": "2",
     }

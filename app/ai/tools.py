@@ -137,7 +137,8 @@ TOOLS: dict[str, tuple[str, type[BaseModel], Callable]] = {
 
 
 def _strict(schema: dict) -> dict:
-    """OpenAI strict mode: every property required, no additional properties, recursively."""
+    """Strict tool schemas: every property required, no additional properties, refs inlined.
+    Range/length constraints are dropped from the schema and enforced by Pydantic in ``run_tool``."""
     schema = json.loads(json.dumps(schema))
     defs = schema.pop("$defs", {})
 
@@ -171,17 +172,9 @@ def _strict(schema: dict) -> dict:
     return fix(schema)
 
 
-def openai_tool_specs() -> list[dict]:
+def claude_tool_specs() -> list[dict]:
     return [
-        {
-            "type": "function",
-            "function": {
-                "name": n,
-                "description": d,
-                "strict": True,
-                "parameters": _strict(m.model_json_schema()),
-            },
-        }
+        {"name": n, "description": d, "strict": True, "input_schema": _strict(m.model_json_schema())}
         for n, (d, m, _) in TOOLS.items()
     ]
 

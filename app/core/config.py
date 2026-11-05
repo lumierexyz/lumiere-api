@@ -36,9 +36,9 @@ class Settings(BaseSettings):
     http_timeout_seconds: float = 15.0
     http_max_retries: int = 3
 
-    # OpenAI
-    openai_api_key: str = ""
-    openai_model: str = "gpt-4.1-mini"
+    # Anthropic (transaction classification fallback and the agent)
+    anthropic_api_key: str = ""
+    anthropic_model: str = "claude-opus-5-5"
     agent_max_tool_rounds: int = 6
 
     # Limits

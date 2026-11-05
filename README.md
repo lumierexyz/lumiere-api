@@ -104,7 +104,7 @@ gcloud artifacts repositories create lumiere --repository-format=docker --locati
 gcloud builds submit --tag $REGION-docker.pkg.dev/$PROJECT/lumiere/api:latest
 
 # Secrets (once)
-for s in DATABASE_URL SUPABASE_SERVICE_ROLE_KEY FRED_API_KEY OPENAI_API_KEY; do
+for s in DATABASE_URL SUPABASE_SERVICE_ROLE_KEY FRED_API_KEY ANTHROPIC_API_KEY; do
   printf '%s' "${!s}" | gcloud secrets create $s --data-file=-; done
 
 # Migrations as a Cloud Run job, then the service
@@ -115,7 +115,7 @@ gcloud run jobs execute lumiere-migrate --region $REGION --wait
 gcloud run deploy lumiere-api --image $REGION-docker.pkg.dev/$PROJECT/lumiere/api:latest --region $REGION \
   --allow-unauthenticated --port 8080 --min-instances 0 --max-instances 10 \
   --set-env-vars ENVIRONMENT=production,SUPABASE_URL=https://PROJECT_REF.supabase.co,CORS_ORIGINS=https://your-frontend \
-  --set-secrets DATABASE_URL=DATABASE_URL:latest,SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest,FRED_API_KEY=FRED_API_KEY:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest
+  --set-secrets DATABASE_URL=DATABASE_URL:latest,SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest,FRED_API_KEY=FRED_API_KEY:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest
 ```
 
 `--allow-unauthenticated` exposes the service to the internet; every `/api/v1` route still requires a valid
