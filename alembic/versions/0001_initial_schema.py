@@ -30,9 +30,22 @@ REFERENCE = ["economic_series", "economic_observations", "fx_rates"]
 
 
 def _postgres_security() -> None:
-    """Defence in depth for Supabase. The API connects with a privileged role and filters every query by
-    the verified JWT subject; these policies additionally ensure that a client using the Supabase anon key
-    directly can only ever reach its own rows, and cannot write reference data or read audit logs."""
+    """Row-level security as defence in depth. The API connects with a privileged role and filters every
+    query by the verified token subject.
+
+    * AUTH_PROVIDER=privy (default): browsers never talk to the database directly, so RLS is enabled on
+      every table with no client policy at all: the anon/authenticated roles can read or write nothing.
+    * AUTH_PROVIDER=supabase: owner-only policies keyed on ``auth.uid()``, profiles linked to
+      ``auth.users`` with cascading deletes, read-only reference data, no client access to audit logs.
+    """
+    from app.core.config import get_settings
+
+    all_tables = ["profiles", *USER_OWNED, "audit_logs", *REFERENCE]
+    if get_settings().auth_provider != "supabase":
+        for t in all_tables:
+            op.execute(f"alter table {t} enable row level security")
+        return
+
     if context.is_offline_mode():
         has_auth = True  # offline SQL (alembic upgrade --sql) is generated for Supabase
     else:
@@ -114,6 +127,7 @@ def upgrade() -> None:
     op.create_table(
         "profiles",
         sa.Column("id", sa.Uuid(), nullable=False),
+        sa.Column("auth_subject", sa.String(length=255), nullable=True),
         sa.Column("email", sa.String(length=320), nullable=True),
         sa.Column("display_name", sa.String(length=120), nullable=True),
         sa.Column("base_currency", sa.String(length=3), nullable=False),
@@ -122,6 +136,7 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("auth_subject"),
     )
     op.create_table(
         "agent_conversations",

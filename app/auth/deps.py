@@ -34,12 +34,17 @@ CurrentUser = Annotated[AuthenticatedUser, Depends(get_current_user)]
 def get_profile(user: CurrentUser, db: DbSession) -> Profile:
     """Return the caller's profile, creating it on first authenticated request.
 
-    Sign-up happens in the frontend through Supabase Auth; the first API call provisions the
-    matching profile row from verified claims only.
+    Sign-up happens in the frontend (Privy email code); the first API call provisions the matching
+    profile from the verified token. For Privy the verified email is read server-side with the app secret.
     """
     profile = db.get(Profile, user.id)
     if profile is None:
-        profile = Profile(id=user.id, email=user.email)
+        email = user.email
+        if user.provider == "privy":
+            from app.auth import privy_admin
+
+            email = privy_admin.user_email(user.subject)
+        profile = Profile(id=user.id, auth_subject=user.subject, email=email)
         db.add(profile)
         db.commit()
     return profile

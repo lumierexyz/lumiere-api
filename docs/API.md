@@ -1,7 +1,7 @@
 # Lumiere API contract (v1)
 
 Base URL: `https://<cloud-run-host>/api/v1`. Every call except `/health` and `/ready` needs
-`Authorization: Bearer <supabase access_token>`.
+`Authorization: Bearer <Privy access token>` (from `privy.getAccessToken()` after the email-code sign-in).
 
 Errors always look like:
 
@@ -41,7 +41,7 @@ Common codes: `unauthorized` (401), `not_found` (404, also for other users' obje
 ## Examples
 
 ```bash
-TOKEN=...   # supabase.auth.getSession() -> session.access_token
+TOKEN=...   # await privy.getAccessToken() in the browser
 API=https://<host>/api/v1
 
 curl -X PATCH $API/me -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \

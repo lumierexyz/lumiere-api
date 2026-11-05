@@ -1,9 +1,10 @@
 """Application settings, read from environment variables only (never from committed files)."""
 
 from functools import lru_cache
+from typing import Annotated
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -11,7 +12,13 @@ class Settings(BaseSettings):
 
     environment: str = Field(default="development", description="development | test | production")
     database_url: str = Field(default="sqlite:///./lumiere-dev.db")
-    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
+    # Comma-separated in the environment (NoDecode: not parsed as JSON).
+    cors_origins: Annotated[list[str], NoDecode] = Field(default_factory=lambda: ["http://localhost:3000"])
+
+    # Identity provider: "privy" (email-code accounts, default) or "supabase".
+    auth_provider: str = "privy"
+    privy_app_id: str = ""
+    privy_app_secret: str = ""  # server-side only: profile email lookup and account deletion
 
     # Supabase Auth. The backend only needs public verification material plus, optionally,
     # the service-role key for server-side account deletion. The service-role key must never
@@ -48,13 +55,21 @@ class Settings(BaseSettings):
         return v
 
     @property
+    def auth_configured(self) -> bool:
+        return bool(self.privy_app_id) if self.auth_provider == "privy" else bool(self.supabase_url)
+
+    @property
     def jwks_url(self) -> str:
+        if self.auth_provider == "privy":
+            return f"https://auth.privy.io/api/v1/apps/{self.privy_app_id}/jwks.json"
         if self.supabase_jwks_url:
             return self.supabase_jwks_url
         return f"{self.supabase_url.rstrip('/')}/auth/v1/.well-known/jwks.json" if self.supabase_url else ""
 
     @property
     def jwt_issuer(self) -> str:
+        if self.auth_provider == "privy":
+            return "privy.io"
         return f"{self.supabase_url.rstrip('/')}/auth/v1" if self.supabase_url else ""
 
 

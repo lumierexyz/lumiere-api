@@ -9,6 +9,9 @@ os.environ.update(
     {
         "ENVIRONMENT": "test",
         "DATABASE_URL": "sqlite://",
+        "AUTH_PROVIDER": "supabase",
+        "PRIVY_APP_ID": "",
+        "PRIVY_APP_SECRET": "",
         "SUPABASE_URL": "https://test-project.supabase.co",
         "SUPABASE_JWT_SECRET": "",
         "FRED_API_KEY": "test-fred-key",

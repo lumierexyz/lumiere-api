@@ -89,14 +89,18 @@ def delete_account(
 
     if not confirm:
         raise AppError("Pass confirm=true to permanently delete the account.", code="confirmation_required")
-    uid = profile.id
+    uid, subject = profile.id, profile.auth_subject
     db.delete(profile)  # cascades to every user-owned table
     audit(db, uid, "account.deleted")
     db.commit()
 
     settings = get_settings()
     auth_deleted = False
-    if settings.supabase_service_role_key and settings.supabase_url:
+    if settings.auth_provider == "privy":
+        from app.auth import privy_admin
+
+        auth_deleted = bool(subject) and privy_admin.delete_user(subject)
+    elif settings.supabase_service_role_key and settings.supabase_url:
         try:
             r = httpx.delete(
                 f"{settings.supabase_url.rstrip('/')}/auth/v1/admin/users/{uid}",
@@ -113,6 +117,6 @@ def delete_account(
         "Account and all data deleted."
         if auth_deleted
         else "All data deleted. The sign-in account could not be removed server-side; "
-        "it must be deleted from Supabase Auth."
+        "it must be deleted from the identity provider dashboard."
     )
     return DeletionResult(deleted_financial_data=True, deleted_auth_account=auth_deleted, note=note)

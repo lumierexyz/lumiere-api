@@ -79,7 +79,7 @@ def create_app() -> FastAPI:
     def ready() -> JSONResponse:
         checks = {
             "database": False,
-            "auth_configured": bool(settings.jwt_issuer),
+            "auth_configured": settings.auth_configured,
             "fred_configured": bool(settings.fred_api_key),
             "openai_configured": bool(settings.openai_api_key),
         }

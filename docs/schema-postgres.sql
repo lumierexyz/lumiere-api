@@ -47,6 +47,7 @@ CREATE TABLE fx_rates (
 
 CREATE TABLE profiles (
     id UUID NOT NULL, 
+    auth_subject VARCHAR(255), 
     email VARCHAR(320), 
     display_name VARCHAR(120), 
     base_currency VARCHAR(3) NOT NULL, 
@@ -54,7 +55,8 @@ CREATE TABLE profiles (
     date_order VARCHAR(3), 
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL, 
     created_at TIMESTAMP WITH TIME ZONE NOT NULL, 
-    PRIMARY KEY (id)
+    PRIMARY KEY (id), 
+    UNIQUE (auth_subject)
 );
 
 CREATE TABLE agent_conversations (
@@ -169,49 +171,27 @@ CREATE INDEX ix_transactions_user_date ON transactions (user_id, booked_on);
 
 CREATE INDEX ix_transactions_user_id ON transactions (user_id);
 
-alter table profiles add constraint fk_profiles_auth_users foreign key (id) references auth.users(id) on delete cascade;
-
 alter table profiles enable row level security;
-
-create policy profiles_owner on profiles for all using (id = (select auth.uid())) with check (id = (select auth.uid()));
 
 alter table import_batches enable row level security;
 
-create policy import_batches_owner on import_batches for all using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
-
 alter table transactions enable row level security;
-
-create policy transactions_owner on transactions for all using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
 
 alter table forecasts enable row level security;
 
-create policy forecasts_owner on forecasts for all using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
-
 alter table portfolio_simulations enable row level security;
-
-create policy portfolio_simulations_owner on portfolio_simulations for all using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
 
 alter table agent_conversations enable row level security;
 
-create policy agent_conversations_owner on agent_conversations for all using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
-
 alter table agent_messages enable row level security;
-
-create policy agent_messages_owner on agent_messages for all using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
 
 alter table audit_logs enable row level security;
 
 alter table economic_series enable row level security;
 
-create policy economic_series_read on economic_series for select using (true);
-
 alter table economic_observations enable row level security;
 
-create policy economic_observations_read on economic_observations for select using (true);
-
 alter table fx_rates enable row level security;
-
-create policy fx_rates_read on fx_rates for select using (true);
 
 INSERT INTO alembic_version (version_num) VALUES ('0001') RETURNING alembic_version.version_num;
 

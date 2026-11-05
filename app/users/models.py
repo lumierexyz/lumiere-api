@@ -9,11 +9,13 @@ from app.database.types import IdMixin, JsonType, TimestampMixin, utcnow
 
 
 class Profile(TimestampMixin, Base):
-    """One row per Supabase auth user. ``id`` equals ``auth.users.id`` (the JWT ``sub``)."""
+    """One row per account. ``id`` is derived from the verified token subject (see ``app.auth.jwt``)."""
 
     __tablename__ = "profiles"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    # Identity-provider subject (Privy DID such as "did:privy:..." or Supabase user id).
+    auth_subject: Mapped[str | None] = mapped_column(String(255), unique=True)
     email: Mapped[str | None] = mapped_column(String(320))
     display_name: Mapped[str | None] = mapped_column(String(120))
     base_currency: Mapped[str] = mapped_column(String(3), default="USD", nullable=False)

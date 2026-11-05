@@ -12,7 +12,7 @@ portfolio results are conditional estimates and simulations.
 ```
 app/
   core/           settings (env only), JSON logging without financial content, error envelope, rate limiting
-  auth/           Supabase JWT verification (JWKS ES256/RS256, legacy HS256), CurrentUser/CurrentProfile deps
+  auth/           Privy (default) or Supabase token verification via JWKS, Privy server API, CurrentUser/Profile deps
   database/       engine/session, portable column types, results tables (forecasts, simulations, agent)
   users/          profiles, audit log, profile update, data/account deletion
   transactions/   CSV normalisation, deterministic categorisation, duplicate detection, corrections
@@ -28,7 +28,7 @@ app/
 
 Key rules the code enforces:
 
-* **Identity** comes only from the verified token `sub`. No route accepts a `user_id`; every query filters
+* **Identity** comes only from the verified token `sub` (Privy DID mapped to a stable UUID v5, or the Supabase user id). No route accepts a `user_id`; every query filters
   by it, and objects owned by another user return 404. Postgres RLS policies (migration `0001`) add a
   second layer for any direct Supabase client access.
 * **Calculations are deterministic Python** (pandas/numpy/CVXPY). The LLM only chooses which server tool
@@ -71,7 +71,18 @@ Quality gates:
 uv run ruff check . && uv run ruff format --check . && uv run pytest
 ```
 
-## Supabase setup
+## Accounts (Privy)
+
+People create their account on the product page with an email code (Privy `login-or-sign-up`). The
+browser sends the Privy access token to the API, which verifies it against
+`https://auth.privy.io/api/v1/apps/<PRIVY_APP_ID>/jwks.json` (ES256, `iss=privy.io`, `aud=<app id>`).
+On the first request the API creates the profile and reads the verified email with `PRIVY_APP_SECRET`.
+In the Privy dashboard, restrict **Allowed domains** to the production domain(s) and localhost.
+
+With Privy, the database is reached only by the API: migration `0001` enables RLS on every table with no
+client policy. Supabase can still host the Postgres database; only its Auth is unused.
+
+## Supabase setup (database, or Auth with AUTH_PROVIDER=supabase)
 
 1. Create the project; in **Authentication** enable email (or your providers). New projects sign access
    tokens with asymmetric keys, verified through `SUPABASE_URL/auth/v1/.well-known/jwks.json`. For a
