@@ -6,7 +6,8 @@ because no direct category index exists). Unmapped categories fall back to the h
 fallback is reported explicitly in every API response.
 
 EU codes are COICOP 2018 (Eurostat ``prc_hicp_minr``, index 2015=100), verified against the live API.
-US codes are BLS CPI-U series published on FRED (seasonally adjusted where available).
+US codes are BLS CPI-U series published on FRED (seasonally adjusted), verified against FRED. FRED publishes
+no insurance price index, so US insurance falls back to the headline index (flagged).
 """
 
 from dataclasses import dataclass
@@ -31,13 +32,12 @@ US_MAP: dict[str, tuple[str, str, bool]] = {
     Category.HOUSING: ("CUSR0000SAH1", "CPI-U shelter", False),
     Category.GROCERIES: ("CUSR0000SAF11", "CPI-U food at home", False),
     Category.RESTAURANTS: ("CUSR0000SEFV", "CPI-U food away from home", False),
-    Category.TRANSPORTATION: ("CUSR0000SAT", "CPI-U transportation", False),
-    Category.ENERGY: ("CUSR0000SA0E", "CPI-U energy", False),
-    Category.HEALTHCARE: ("CUSR0000SAM", "CPI-U medical care", False),
-    Category.INSURANCE: ("CUSR0000SETE", "CPI-U motor vehicle insurance (proxy for all insurance)", True),
+    Category.TRANSPORTATION: ("CPITRNSL", "CPI-U transportation", False),
+    Category.ENERGY: ("CPIENGSL", "CPI-U energy", False),
+    Category.HEALTHCARE: ("CPIMEDSL", "CPI-U medical care", False),
     Category.SUBSCRIPTIONS: ("CUSR0000SAE2", "CPI-U communication (proxy for subscriptions)", True),
     Category.EDUCATION: ("CUSR0000SAE1", "CPI-U education", False),
-    Category.ENTERTAINMENT: ("CUSR0000SAR", "CPI-U recreation", False),
+    Category.ENTERTAINMENT: ("CPIRECSL", "CPI-U recreation", False),
 }
 
 EU_MAP: dict[str, tuple[str, str, bool]] = {

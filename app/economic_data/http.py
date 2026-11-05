@@ -17,7 +17,7 @@ def set_transport(transport: httpx.BaseTransport | None) -> None:
     _transport = transport
 
 
-def get_json(provider: str, url: str, params: dict, *, sleep=time.sleep) -> dict:
+def _get(provider: str, url: str, params: dict, *, as_json: bool, sleep=time.sleep):
     s = get_settings()
     last_error = "unknown error"
     with httpx.Client(
@@ -30,6 +30,8 @@ def get_json(provider: str, url: str, params: dict, *, sleep=time.sleep) -> dict
                 last_error = type(exc).__name__
             else:
                 if r.status_code == 200:
+                    if not as_json:
+                        return r.text
                     try:
                         return r.json()
                     except ValueError:
@@ -51,3 +53,11 @@ def get_json(provider: str, url: str, params: dict, *, sleep=time.sleep) -> dict
             if attempt < s.http_max_retries:
                 sleep(min(2 ** (attempt - 1), 8))
     raise UpstreamError(f"{provider} is unavailable ({last_error}).", details={"provider": provider})
+
+
+def get_json(provider: str, url: str, params: dict, *, sleep=time.sleep) -> dict:
+    return _get(provider, url, params, as_json=True, sleep=sleep)
+
+
+def get_text(provider: str, url: str, params: dict, *, sleep=time.sleep) -> str:
+    return _get(provider, url, params, as_json=False, sleep=sleep)

@@ -55,7 +55,7 @@ def test_series_endpoint_reports_mapping(seeded, auth):
     r = seeded.get("/api/v1/economic-data/series", headers=auth).json()
     assert r["supported"] and r["source"] == "fred"
     ins = next(s for s in r["series"] if s["category"] == "insurance")
-    assert ins["proxy"] is True
+    assert ins["fallback"] and ins["series_id"] == "CPIAUCSL"
     other = next(s for s in r["series"] if s["category"] == "other")
     assert other["fallback"]
 
@@ -112,7 +112,7 @@ def test_pei_no_lookahead(client, auth, providers):
 
 
 def test_pei_missing_category_series_renormalises(client, auth, providers):
-    providers.failing.add("CUSR0000SA0E")  # energy index unavailable
+    providers.failing.add("CPIENGSL")  # energy index unavailable
     client.post(
         "/api/v1/transactions/import",
         headers=auth,
@@ -207,3 +207,23 @@ def test_coverage_inflation_reduces_months(seeded, auth):
 def test_coverage_requires_rate_for_foreign_reserves(seeded, auth):
     r = seeded.post("/api/v1/coverage/calculate", headers=auth, json={"reserves": 1000, "currency": "EUR"})
     assert r.status_code == 400 and r.json()["error"]["code"] == "conversion_unavailable"
+
+
+def test_fred_keyless_csv_fallback(db, monkeypatch):
+    """Without FRED_API_KEY the public CSV export is used; '.' values are skipped."""
+    from app.core.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "fred_api_key", "")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.host == "fred.stlouisfed.org" and request.url.params["id"] == "CPIAUCSL"
+        csv = "observation_date,CPIAUCSL\n2026-01-01,320.1\n2026-02-01,.\n2026-03-01,321.4\n"
+        return httpx.Response(200, text=csv)
+
+    econ_http.set_transport(httpx.MockTransport(handler))
+    try:
+        row = refresh_series(db, SeriesSpec("fred", "CPIAUCSL", "US", "headline"), force=True)
+        s = monthly_index(db, row)
+    finally:
+        econ_http.set_transport(None)
+    assert row.status == "ok" and list(s.values) == [320.1, 321.4]
