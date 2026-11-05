@@ -1,0 +1,13 @@
+.venv
+.env
+.env.*
+tests
+docs
+alembic
+alembic.ini
+*.db
+.github
+Dockerfile
+__pycache__
+.pytest_cache
+.ruff_cache

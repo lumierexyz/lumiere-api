@@ -19,6 +19,10 @@ class Base(DeclarativeBase):
 
 def make_engine(url: str) -> Engine:
     kwargs: dict = {"pool_pre_ping": True}
+    if url.startswith("postgresql+psycopg"):
+        # Neon/Supabase poolers run PgBouncer in transaction mode: no server-side prepared statements.
+        kwargs["connect_args"] = {"prepare_threshold": None}
+        kwargs.update(pool_size=3, max_overflow=2, pool_recycle=300)
     if url.startswith("sqlite"):
         kwargs["connect_args"] = {"check_same_thread": False}
     engine = create_engine(url, **kwargs)

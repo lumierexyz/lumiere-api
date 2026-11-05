@@ -51,6 +51,16 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 120
     agent_rate_limit_per_minute: int = 12
 
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def _sqlalchemy_driver(cls, v: object) -> object:
+        """Accept provider URLs (Neon/Vercel/Supabase give postgres:// or postgresql://) and use psycopg 3."""
+        if isinstance(v, str):
+            for prefix in ("postgres://", "postgresql://"):
+                if v.startswith(prefix):
+                    return "postgresql+psycopg://" + v[len(prefix):]
+        return v
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_origins(cls, v: object) -> object:
