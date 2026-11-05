@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     http_timeout_seconds: float = 15.0
     http_max_retries: int = 3
 
+    # On-chain reserves (read-only)
+    robinhood_rpc_url: str = "https://rpc.mainnet.chain.robinhood.com"
+
     # LLM provider for transaction classification and the agent: "openai" or "anthropic".
     # Empty = Anthropic when ANTHROPIC_API_KEY is set, otherwise OpenAI.
     ai_provider: str = ""

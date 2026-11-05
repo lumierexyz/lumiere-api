@@ -59,3 +59,26 @@ def delete_user(did: str) -> bool:
     except httpx.HTTPError:
         logger.warning("privy_user_delete_failed", extra={"provider": "privy"})
         return False
+
+
+def user_wallets(did: str) -> list[str] | None:
+    """Ethereum addresses linked to the Privy user (each one proven by a signature at link time).
+    None when Privy cannot be reached, so callers can tell "no wallet" from "unknown"."""
+    client = _client()
+    if client is None:
+        return None
+    try:
+        with client:
+            r = client.get(f"/users/{did}")
+        if r.status_code != 200:
+            return None
+        return [
+            a["address"]
+            for a in r.json().get("linked_accounts", [])
+            if a.get("type") == "wallet"
+            and a.get("chain_type", "ethereum") == "ethereum"
+            and a.get("address")
+        ]
+    except (httpx.HTTPError, ValueError, KeyError):
+        logger.warning("privy_wallet_lookup_failed", extra={"provider": "privy"})
+        return None
