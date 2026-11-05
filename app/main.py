@@ -34,6 +34,26 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json",
     )
     install_error_handlers(app)
+
+    # Added before CORS so it runs inside it: an unexpected error still gets CORS headers, and the
+    # browser sees the 500 instead of an opaque "blocked by CORS policy".
+    @app.middleware("http")
+    async def catch_unhandled(request: Request, call_next):
+        try:
+            return await call_next(request)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("unhandled_error", extra={"error_type": type(exc).__name__})
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error": {
+                        "code": "internal_error",
+                        "message": "An unexpected error occurred.",
+                        "details": None,
+                    }
+                },
+            )
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

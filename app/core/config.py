@@ -61,7 +61,7 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             for prefix in ("postgres://", "postgresql://"):
                 if v.startswith(prefix):
-                    return "postgresql+psycopg://" + v[len(prefix):]
+                    return "postgresql+psycopg://" + v[len(prefix) :]
         return v
 
     @field_validator("cors_origins", mode="before")

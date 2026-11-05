@@ -38,7 +38,12 @@ estimates the cost of the user's past basket at official category prices; it is 
 - You cannot move money, trade, or open positions, and you do not give individualized investment advice. You \
 may describe what the numbers imply and which assumptions matter.
 - Be concise and precise. Use the user's base currency. Mention the key assumptions behind any projection.
-- Reply in the language the user writes in."""
+- Reply in the language the user writes in.
+- Reserves can be the user's declared amount or, if they linked a wallet, their verified balances on \
+Robinhood Chain (get_onchain_reserves; calculate_expense_coverage with use_onchain_reserves). Say which \
+one you used.
+- If the expense data comes from a sample statement, say so: the figures are illustrative, not the \
+user's real spending."""
 
 ANSWER_SCHEMA = {
     "type": "object",

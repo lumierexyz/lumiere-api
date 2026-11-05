@@ -9,6 +9,7 @@ from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -30,6 +31,23 @@ def _get_row(db: Session, spec: SeriesSpec) -> EconomicSeries | None:
 
 
 def refresh_series(db: Session, spec: SeriesSpec, force: bool = False) -> EconomicSeries:
+    """Fetch and store a series unless the stored copy is fresh.
+
+    Several requests from one page can refresh the same series at the same moment (index, history,
+    forecast and coverage load in parallel). If another request wins the race, its rows violate a
+    unique constraint here: roll back and use what it stored."""
+    try:
+        return _refresh_series(db, spec, force)
+    except IntegrityError:
+        db.rollback()
+        logger.info("series_refresh_race", extra={"provider": spec.source, "series_id": spec.code})
+        row = _get_row(db, spec)
+        if row is None:
+            raise
+        return row
+
+
+def _refresh_series(db: Session, spec: SeriesSpec, force: bool) -> EconomicSeries:
     row = _get_row(db, spec)
     ttl = timedelta(hours=get_settings().economic_data_ttl_hours)
     now = datetime.now(UTC)

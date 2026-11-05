@@ -5,8 +5,8 @@ from decimal import Decimal
 from typing import Literal
 
 from fastapi import APIRouter, File, Form, Query, UploadFile
-from pydantic import BaseModel
-from sqlalchemy import func, select
+from pydantic import BaseModel, Field
+from sqlalchemy import delete, func, select
 
 from app.auth.deps import CurrentProfile, DbSession
 from app.core.config import get_settings
@@ -15,6 +15,7 @@ from app.schemas.common import Page
 from app.transactions import service
 from app.transactions.csv_parser import CsvFormatError, parse_csv
 from app.transactions.models import Category, ImportBatch, Kind, Transaction
+from app.transactions.sample import SAMPLE_FILENAME, build_sample
 
 router = APIRouter(tags=["transactions"])
 
@@ -117,6 +118,65 @@ async def import_csv(
         warnings=parsed.warnings,
         normalization=parsed.normalization,
     )
+
+
+# ---------------------------------------------------------------- sample statement
+
+
+class SampleIn(BaseModel):
+    monthly: dict[Category, float] | None = Field(
+        default=None, description="Monthly amount per category (from the onboarding questionnaire)"
+    )
+
+
+def _sample_batches(db, user_id) -> list[ImportBatch]:
+    return [
+        b
+        for b in db.scalars(select(ImportBatch).where(ImportBatch.user_id == user_id))
+        if (b.normalization or {}).get("sample")
+    ]
+
+
+def _remove_sample(db, user_id) -> int:
+    ids = [b.id for b in _sample_batches(db, user_id)]
+    if not ids:
+        return 0
+    n = db.execute(
+        delete(Transaction).where(Transaction.user_id == user_id, Transaction.import_id.in_(ids))
+    ).rowcount
+    db.execute(delete(ImportBatch).where(ImportBatch.user_id == user_id, ImportBatch.id.in_(ids)))
+    db.commit()
+    return n or 0
+
+
+@router.get("/transactions/sample")
+def sample_status(profile: CurrentProfile, db: DbSession) -> dict:
+    batches = _sample_batches(db, profile.id)
+    return {"active": bool(batches), "import_id": str(batches[0].id) if batches else None}
+
+
+@router.post("/transactions/sample", response_model=ImportOut, status_code=201)
+def load_sample(body: SampleIn, profile: CurrentProfile, db: DbSession) -> ImportOut:
+    """Load a 15-month sample statement (replaces any previous sample; real imports are untouched)."""
+    _remove_sample(db, profile.id)
+    monthly = {k.value: v for k, v in (body.monthly or {}).items() if 0 < v <= 1e6}
+    parsed = build_sample(profile.id, profile.base_currency, monthly, date.today())
+    batch = service.import_rows(db, profile.id, SAMPLE_FILENAME, "sample", parsed)
+    return ImportOut(
+        import_id=str(batch.id),
+        rows=batch.row_count,
+        imported=batch.imported_count,
+        duplicates=batch.duplicate_count,
+        rejected=batch.rejected_count,
+        rejected_rows=[],
+        warnings=parsed.warnings,
+        normalization=parsed.normalization,
+    )
+
+
+@router.delete("/transactions/sample")
+def remove_sample(profile: CurrentProfile, db: DbSession) -> dict:
+    return {"removed_transactions": _remove_sample(db, profile.id)}
 
 
 @router.get("/transactions", response_model=Page[TransactionOut])

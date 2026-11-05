@@ -10,14 +10,16 @@ from collections.abc import Callable
 from typing import Literal
 
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
 from app.expenses import analytics
 from app.forecasting import engine
+from app.onchain.service import onchain_reserves
 from app.risk.routes import coverage_for_profile
 from app.services import context
-from app.transactions.models import Category
+from app.transactions.models import Category, ImportBatch
 from app.users.models import Profile
 
 
@@ -37,6 +39,11 @@ class ForecastArgs(BaseModel):
 
 
 class CoverageArgs(BaseModel):
+    use_onchain_reserves: bool = Field(
+        default=False,
+        description="True: use the verified balances of the user's linked wallets on Robinhood Chain "
+        "(reserves and currency are then ignored)",
+    )
     reserves: float = Field(gt=0, le=1e12)
     currency: str = Field(pattern=r"^[A-Z]{3}$")
     inflation_shift_pp: float = Field(default=0.0, ge=-20, le=50)
@@ -75,6 +82,10 @@ def _expense_summary(db: Session, profile: Profile, _: NoArgs) -> dict:
         {k: v for k, v in u.items() if k != "merchant"} for u in s["unusual_changes"][:5]
     ]
     out["monthly_totals_last_12"] = s["monthly_totals"][-12:]
+    out["sample_data"] = any(
+        (b.normalization or {}).get("sample")
+        for b in db.scalars(select(ImportBatch).where(ImportBatch.user_id == profile.id))
+    )
     return out
 
 
@@ -98,7 +109,42 @@ def _forecast(db: Session, profile: Profile, a: ForecastArgs) -> dict:
     return r
 
 
+def _onchain(db: Session, profile: Profile, _: NoArgs) -> dict:
+    r = onchain_reserves(db, profile)
+    return {
+        "linked_wallets": len(r["wallets"]),
+        "verified": r["verified"],
+        "chain": r["chain"]["name"],
+        "total": r["total"],
+        "total_usd": r["total_usd"],
+        "base_currency": r["base_currency"],
+        "holdings": [
+            {k: h.get(k) for k in ("symbol", "name", "kind", "amount", "price_usd", "value", "value_usd")}
+            for h in r["holdings"]
+        ],
+        "unpriced": r["unpriced"],
+        "as_of": r["as_of"],
+        "notes": r["notes"],
+    }
+
+
 def _coverage(db: Session, profile: Profile, a: CoverageArgs) -> dict:
+    if a.use_onchain_reserves:
+        oc = onchain_reserves(db, profile)
+        if not oc["wallets"]:
+            raise AppError("No wallet is linked to this account.", code="no_linked_wallet")
+        if not oc["total"]:
+            raise AppError("The linked wallets hold no priced assets.", code="no_onchain_reserves")
+        r = coverage_for_profile(
+            db,
+            profile,
+            oc["total"],
+            profile.base_currency,
+            _scenarios(a.inflation_shift_pp, a.shocks),
+            verified=True,
+        )
+        r.pop("methodology", None)
+        return r
     r = coverage_for_profile(db, profile, a.reserves, a.currency, _scenarios(a.inflation_shift_pp, a.shocks))
     r.pop("methodology", None)
     return r
@@ -126,6 +172,12 @@ TOOLS: dict[str, tuple[str, type[BaseModel], Callable]] = {
         "with an inflation shift and category price shocks.",
         ForecastArgs,
         _forecast,
+    ),
+    "get_onchain_reserves": (
+        "Verified balances of the wallets the user linked on Robinhood Chain (ETH, stablecoins, "
+        "tokenized stocks), valued in the base currency.",
+        NoArgs,
+        _onchain,
     ),
     "calculate_expense_coverage": (
         "How many months/days the given reserves would cover projected expenses, "
